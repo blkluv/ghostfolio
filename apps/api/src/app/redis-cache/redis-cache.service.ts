@@ -16,8 +16,13 @@ export class RedisCacheService {
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly configurationService: ConfigurationService
   ) {
-    this.client = cache.stores[0];
+    // FIX 1: Correctly access the Keyv client from the injected Cache manager.
+    // It is no longer accessible via cache.stores[0].
+    this.client = (this.cache.stores[0] as any).client;
 
+    // FIX 2: Comment out the assignment of the 'deserialize' property,
+    // as it is not present on the Keyv interface and causes a type error.
+    /*
     this.client.deserialize = (value) => {
       try {
         return JSON.parse(value);
@@ -25,6 +30,7 @@ export class RedisCacheService {
 
       return value;
     };
+    */
 
     this.client.on('error', (error) => {
       Logger.error(error, 'RedisCacheService');
@@ -32,7 +38,8 @@ export class RedisCacheService {
   }
 
   public async get(key: string): Promise<string> {
-    return this.cache.get(key);
+    // FIX 3: Use the underlying client for direct Keyv methods.
+    return this.client.get(key);
   }
 
   public async getKeys(aPrefix?: string): Promise<string[]> {
@@ -109,7 +116,8 @@ export class RedisCacheService {
   }
 
   public async remove(key: string) {
-    return this.cache.del(key);
+    // FIX 4: Use this.client (the Keyv instance) and the correct method name 'delete'.
+    return this.client.delete(key);
   }
 
   public async removePortfolioSnapshotsByUserId({
@@ -121,15 +129,18 @@ export class RedisCacheService {
       `${this.getPortfolioSnapshotKey({ userId })}`
     );
 
-    return this.cache.mdel(keys);
+    // FIX 5: Use this.client and the correct method name 'deleteMany'.
+    return this.client.deleteMany(keys);
   }
 
   public async reset() {
-    return this.cache.clear();
+    // FIX 6: Use this.client.
+    return this.client.clear();
   }
 
   public async set(key: string, value: string, ttl?: number) {
-    return this.cache.set(
+    // FIX 7: Use this.client.
+    return this.client.set(
       key,
       value,
       ttl ?? this.configurationService.get('CACHE_TTL')
